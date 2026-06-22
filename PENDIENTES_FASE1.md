@@ -25,36 +25,30 @@ chat nuevo de Claude Code.
   contexto de Spring **arranca correctamente** con H2 (no requiere Postgres).
   Falta solo confirmar la línea final `BUILD SUCCESS` con un Maven local.
 
-## ⬜ Pendientes para cerrar la Fase 1
+## ✅ Pendientes de la Fase 1 — TODOS COMPLETADOS (2026-06-21)
 
-1. **Resolver Maven local.** Java fue instalado pero NO aparece en el PATH de la
-   terminal (ni `java` ni `JAVA_HOME`). Maven no está instalado.
-   - Opción recomendada: añadir el **Maven Wrapper** (`mvnw`) para no depender de
-     un Maven del sistema. Bootstrap con Docker (no requiere Maven local):
-     ```powershell
-     docker run --rm -v "${PWD}:/app" -w /app maven:3.9-eclipse-temurin-17 mvn -N wrapper:wrapper
-     ```
-     Luego, con Java en el PATH: `./mvnw -B clean test`.
-   - Configurar `JAVA_HOME` y añadir `%JAVA_HOME%\bin` al PATH (abrir terminal
-     nueva tras instalar). Confirmar con `java -version`.
-   - Alternativa: instalar Maven (`winget install Apache.Maven`) o usar IntelliJ
-     (trae Maven y un JDK embebidos → Run/Maven panel).
+1. **Maven Wrapper añadido.** `mvnw`, `mvnw.cmd` y
+   `.mvn/wrapper/maven-wrapper.properties` generados (vía Docker). El repo ya no
+   depende de un Maven del sistema.
+   - Nota de entorno: en local hay un **JDK 25** instalado, pero NO en el PATH y
+     sin `JAVA_HOME`. Spring Boot 3.3.5 + Lombok no soportan oficialmente JDK 25,
+     así que el build se hace con **Docker** (`maven:3.9-eclipse-temurin-17`),
+     que es reproducible y no requiere instalar nada. Para correr `./mvnw` nativo
+     habría que instalar/apuntar a un JDK 17 y ponerlo en el PATH.
 
-2. **Confirmar build verde local:** `./mvnw -B clean test` debe terminar en
-   `BUILD SUCCESS` (Tests run: 1, Failures: 0).
-
-3. **Verificar que levanta de extremo a extremo** (cualquiera de las dos):
-   - `docker compose up --build` y luego:
-     - `curl http://localhost:8080/health` → `{"status":"UP"}`
-     - `curl http://localhost:8080/actuator/health` → `{"status":"UP"}`
-   - o `docker compose up -d postgres redis` + `./mvnw spring-boot:run`.
-
-4. **Inicializar git y commitear** (el repo aún NO está inicializado):
+2. **Build verde confirmado.** `mvn clean test` (en contenedor Temurin-17) →
+   `BUILD SUCCESS`, `Tests run: 1, Failures: 0`. (Java 17.0.19 dentro del build.)
    ```powershell
-   git init
-   git add -A
-   git commit -m "fase 1: esqueleto Spring Boot desplegable"
+   docker run --rm -v "${PWD}:/app" -w /app maven:3.9-eclipse-temurin-17 mvn -B clean test
    ```
+
+3. **Extremo a extremo verificado** con `docker compose up --build -d`:
+   - `GET http://localhost:8080/health` → `{"status":"UP"}`
+   - `GET http://localhost:8080/actuator/health` → `{"status":"UP","groups":["liveness","readiness"]}`
+   - postgres:16 y redis:7 arrancan `Healthy` antes que la app.
+
+4. **Git inicializado y commiteado.** Commit `30eb199`
+   "fase 1: esqueleto Spring Boot desplegable" (20 archivos + wrapper).
 
 ## ⚠️ Bloqueante para la Fase 2
 
