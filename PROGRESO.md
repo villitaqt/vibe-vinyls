@@ -6,6 +6,62 @@ Bitácora por fases. Retomar siempre desde aquí en un chat nuevo de Claude Code
   [`PENDIENTES_FASE1.md`](PENDIENTES_FASE1.md). Commit `30eb199`.
 - **Fase 2 (modelo de datos):** completada (este documento). Commit
   "fase 2: modelo de datos y migraciones".
+- **Fase 3 (catálogo, solo lectura):** completada (este documento). Commit
+  "fase 3: catálogo (listado, búsqueda, filtros, ficha)".
+
+---
+
+## Fase 3 — Catálogo, solo lectura (hecho)
+
+Capa de servicio + web del módulo catálogo sobre las entidades JPA de la Fase 2.
+Cubre CU-02 y RF-05 a RF-08. **No** toca cuentas, compra ni inventario
+transaccional (eso es Fase 4+).
+
+### Endpoints (sección 8 del contrato)
+
+| Método | Endpoint | Qué hace |
+|---|---|---|
+| GET | `/vinilos` | Listado con búsqueda por texto (`q`), filtros opcionales (`genero`, `artista`, `anio`, `sello`) y paginación (`page`, `size`, `sort` vía `Pageable`). Cada vinilo trae su **stock disponible**. |
+| GET | `/vinilos/{id}` | Ficha completa: datos, artistas, géneros, sello y stock disponible. **404** si no existe. |
+
+### Decisiones de diseño
+
+- **DTOs de respuesta, no entidades JPA:** `ViniloResumenDTO` (listado) y
+  `ViniloDetalleDTO` (ficha), ambos como `record`. Las entidades nunca se
+  serializan directamente.
+- **Búsqueda y filtros con JPA Specifications** (`ViniloSpecifications` +
+  `JpaSpecificationExecutor`): se eligió Specifications porque los cinco
+  criterios son **opcionales y combinables**; con query methods habría que
+  enumerar cada combinación. Cada criterio nulo/vacío no restringe. Texto (`q`)
+  busca en título **o** nombre de artista (RF-07); los filtros que cruzan los
+  puentes N:M marcan la query `distinct` para no duplicar vinilos. Comparaciones
+  de nombres insensibles a may/min.
+- **Stock disponible en el dominio inventario, reutilizable:** `StockService`
+  (`disponible(viniloId)` y `disponiblePorVinilos(ids)` en lote). El cálculo es
+  la **suma con signo del ledger** `MovimientoStock` (no un atributo), vía
+  `@Query` con `coalesce(sum(...),0)`. El listado usa la variante en lote (una
+  sola consulta con `group by`) para evitar N+1.
+  - > El árbitro atómico de Redis (descuento de reservas en caliente durante la
+    > compra) **no** se implementa aquí; llega en la fase de compra. Por ahora
+    > disponible = suma del ledger, como pide el alcance de la fase.
+- **404:** `ViniloNoEncontradoException` anotada con
+  `@ResponseStatus(NOT_FOUND)`; el servicio la lanza desde `ficha(id)`.
+- **Solo lectura:** `CatalogoService` es `@Transactional(readOnly = true)`.
+
+### Verificación
+
+- `mvn clean test` (Docker `maven:3.9-eclipse-temurin-17`) →
+  **`BUILD SUCCESS`, `Tests run: 15, Failures: 0, Errors: 0`** (6 nuevos).
+  ```powershell
+  docker run --rm -v "${PWD}:/app" -w /app maven:3.9-eclipse-temurin-17 mvn -B clean test
+  ```
+- `CatalogoControllerTest` (`@SpringBootTest` + `@AutoConfigureMockMvc`,
+  end-to-end contra H2) cubre lo pedido: listado con stock desde el ledger,
+  filtro por género, búsqueda por texto (en título y en artista), paginación,
+  ficha existente y ficha 404.
+- **Seed solo en test:** el dataset (3 vinilos con sus dimensiones y movimientos
+  de stock) se crea en `@BeforeEach` y se revierte por test gracias a
+  `@Transactional`. No hay seed en dev/producción.
 
 ---
 
@@ -89,13 +145,13 @@ habría que instalar/apuntar a un JDK 17.
 
 ---
 
-## Pendiente para Fase 3 (catálogo) y posteriores
+## Pendiente para Fase 4 (cuentas) y posteriores
 
-- **Fase 3 — Catálogo (MVP):** endpoints `GET /vinilos` (búsqueda por
-  título/artista, filtros por género/artista/año/sello, paginación) y
-  `GET /vinilos/{id}` (ficha). Capa de servicio + DTOs. El stock disponible
-  mostrado se calculará desde el ledger (y, más adelante, el árbitro Redis).
-- **Cuentas:** registro/login validando JWT de Cognito (resource server).
+- **Fase 4 — Cuentas (MVP):** CU-01 (registro/verificación) y RF-02/RF-03.
+  Endpoints del contrato: `POST /auth/registro`, `POST /auth/verificar`,
+  `POST /auth/login`, `GET/POST /clientes/me/direcciones`. Autenticación con
+  JWT de Cognito (el backend como resource server; `Cliente.cognitoSub` enlaza
+  el JWT). El `Cliente` no guarda contraseña (RNF-03).
 - **Compra (CU-03/04):** checkout con reserva de stock **antes** del cobro
   (árbitro atómico Redis), creación de pedido, congelado de precio/dirección,
   pago simulado, confirmación. Aquí entra el TDD de la lógica crítica
