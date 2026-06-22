@@ -8,6 +8,9 @@ services:
       redis:
         condition: service_healthy
     environment:
+      # Activa el perfil dev (incluye el seed de catálogo). Sobreescribible:
+      # SPRING_PROFILES_ACTIVE=prod docker compose up
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       POSTGRES_URL: jdbc:postgresql://postgres:5432/vivevinyls
       POSTGRES_USER: ${POSTGRES_USER:-vivevinyls}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vivevinyls}
