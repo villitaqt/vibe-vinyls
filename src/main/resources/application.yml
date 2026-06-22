@@ -26,6 +26,12 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 
+# CORS para el dev server de Vite (frontend de catálogo). Lista parametrizable
+# por variable de entorno; NO se usa "*". Consumido por CorsConfig.
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+
 management:
   endpoints:
     web:
