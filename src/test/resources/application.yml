@@ -9,7 +9,9 @@ spring:
     driver-class-name: org.h2.Driver
   jpa:
     hibernate:
-      ddl-auto: none
+      # En test, Hibernate genera el esquema desde las entidades y lo descarta
+      # al terminar (BD H2 en memoria, efímera por ejecución).
+      ddl-auto: create-drop
     properties:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect

@@ -10,7 +10,9 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: none
+      # Perfil de desarrollo: Hibernate crea y ajusta el esquema desde las
+      # entidades (sin Flyway ni otra herramienta de migración).
+      ddl-auto: update
     open-in-view: false
     properties:
       hibernate:
