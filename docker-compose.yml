@@ -1,0 +1,48 @@
+services:
+  app:
+    build: .
+    container_name: vivevinyls-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      POSTGRES_URL: jdbc:postgresql://postgres:5432/vivevinyls
+      POSTGRES_USER: ${POSTGRES_USER:-vivevinyls}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vivevinyls}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "8080:8080"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: vivevinyls-postgres
+    environment:
+      POSTGRES_DB: vivevinyls
+      POSTGRES_USER: ${POSTGRES_USER:-vivevinyls}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vivevinyls}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vivevinyls} -d vivevinyls"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: vivevinyls-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:

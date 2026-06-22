@@ -1,0 +1,19 @@
+# Configuración solo para los tests: BD en memoria (H2) para que el
+# contexto de Spring arranque sin un Postgres real. Redis usa Lettuce,
+# que conecta de forma perezosa, por lo que no bloquea el arranque.
+spring:
+  datasource:
+    url: jdbc:h2:mem:vivevinyls;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  data:
+    redis:
+      host: localhost
+      port: 6379
