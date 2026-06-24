@@ -19,3 +19,9 @@ spring:
     redis:
       host: localhost
       port: 6379
+
+# CORS: en test basta un origen cualquiera; CorsConfig exige esta propiedad
+# (sin default) desde la fase 3.5. Espeja el valor por defecto del perfil dev.
+app:
+  cors:
+    allowed-origins: http://localhost:5173

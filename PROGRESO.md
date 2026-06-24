@@ -11,6 +11,26 @@ Bitácora por fases. Retomar siempre desde aquí en un chat nuevo de Claude Code
 
 ---
 
+## Análisis de código (SonarQube) — rama `sonarqube`
+
+Rama `sonarqube` (desde `main`) para la actividad de análisis estático del curso.
+
+- **JaCoCo agregado** (`jacoco-maven-plugin` 0.8.12 en el `pom.xml`): `prepare-agent`
+  instrumenta la JVM antes de los tests y el goal `report` (fase `test`) genera
+  `target/site/jacoco/jacoco.xml`, que es el formato que SonarQube lee para el % de
+  cobertura. Sin esto SonarQube reporta 0% aunque haya tests.
+- **Fix de configuración de test (no de código):** el perfil de test no definía
+  `app.cors.allowed-origins`, propiedad que `CorsConfig` exige sin default desde la
+  fase 3.5; el contexto de Spring fallaba al cargar. Se agregó la propiedad a
+  `src/test/resources/application.yml` (espejando el default del perfil dev). No se
+  tocaron tests ni código de aplicación.
+- **Verificación:** `mvn -B clean verify` (Docker `maven:3.9-eclipse-temurin-17`) →
+  **`BUILD SUCCESS`, `Tests run: 15, Failures: 0, Errors: 0`** y se genera
+  `target/site/jacoco/jacoco.xml`.
+- Pendiente (pasos posteriores): configurar SonarQube y el pipeline.
+
+---
+
 ## Fase 3 — Catálogo, solo lectura (hecho)
 
 Capa de servicio + web del módulo catálogo sobre las entidades JPA de la Fase 2.
