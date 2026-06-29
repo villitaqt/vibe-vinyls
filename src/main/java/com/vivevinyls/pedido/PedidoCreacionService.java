@@ -91,6 +91,7 @@ public class PedidoCreacionService {
         }
         movimientos.saveAll(reservas);
 
-        return PedidoResponseMapper.aResponse(guardado);
+        // Recién creado: aún no hay intentos de pago (constancia sin ultimoPago).
+        return PedidoResponseMapper.aResponse(guardado, null);
     }
 }

@@ -12,6 +12,99 @@ Bitácora por fases. Retomar siempre desde aquí en un chat nuevo de Claude Code
   login JWT y libreta de direcciones.
 - **Fase 5a (compra — checkout):** completada (este documento). Reserva atómica
   en Redis + creación de pedido con precio y dirección congelados.
+- **Fase 5b (compra — pago y cierre):** completada (este documento). Pago
+  simulado, consolidación de reservas y expiración. **El backend del MVP queda
+  funcionalmente completo** (registro → catálogo → checkout → pago → constancia).
+
+---
+
+## Fase 5b — Compra: pago simulado, confirmación y expiración (hecho)
+
+Cierra el flujo de venta del MVP (CU-04 + pasos finales de CU-03). La lógica
+crítica es la **máquina de estados del pedido** (TDD). Reutiliza el árbitro y la
+creación de pedidos de 5a; añade pago, consolidación y liberación de reservas.
+
+### Endpoints
+
+| Método | Endpoint | CU/RF | Qué hace |
+|---|---|---|---|
+| POST | `/pedidos/{id}/pago` | CU-04 | Intenta el pago (pasarela simulada), registra un `Pago` y, si captura, transita el pedido a `PAGADO` y consolida la reserva. 200 (captura o rechazo); 409 estado inválido; 404 ajeno/inexistente. |
+| GET | `/pedidos/{id}` | RF-13 | (enriquecido) ahora incluye `ultimoPago` → sirve de **constancia** del resultado. |
+
+Expiración de reservas: **servicio invocable** `expirarReservasVencidas()` + un
+`@Scheduled` que solo lo dispara (planificación activa fuera del perfil test).
+
+### Máquina de estados del pedido (lógica crítica, documentada en `EstadoPedido`)
+
+```
+PENDIENTE_PAGO → PAGADO      (pasarela captura)            — MVP
+PENDIENTE_PAGO → CANCELADO   (reserva expirada)            — MVP
+PAGADO         → CONFIRMADO  (staff confirma despacho)     — back-office [+]
+PAGADO         → CANCELADO   (cancelación con reembolso)   — back-office [+]
+```
+
+- **El pago capturado lleva a `PAGADO`, NO a `CONFIRMADO`** (corrección
+  documentada en el commit `fix(pedido): ...` previo a esta fase). `CONFIRMADO` y
+  `PAGADO → CANCELADO` quedan **soportados estructuralmente pero sin implementar**
+  (back-office `[+]`).
+- Pagar un pedido que no está en `PENDIENTE_PAGO` → `409`, sin efectos.
+
+### Decisiones de diseño
+
+- **Pasarela tras interfaz `PasarelaPago`** (`cobrar(monto, resultadoSimulado) →
+  ResultadoCobro`), impl `PasarelaPagoSimulada`. **RN-04:** nunca se reciben ni
+  guardan datos de tarjeta; el `Pago` solo lleva estado, monto y
+  `referenciaExterna` (un `SIMUL-<uuid>` ficticio). El request acepta
+  `resultadoSimulado` (`CAPTURA`/`RECHAZO`, default `CAPTURA`) — **artefacto
+  temporal** de la simulación que desaparece con la pasarela real.
+- **Cada intento es un `Pago` nuevo** (un pedido admite varios). Captura →
+  `CAPTURADO`; rechazo → `FALLIDO`.
+- **Consolidación al capturar (sin tocar Redis):** se registra `CONFIRMACION`
+  **neutral (cantidad 0)** por ítem — trazabilidad de la venta sin alterar el
+  disponible: la unidad ya salió en la `RESERVA` (5a) y se queda fuera porque se
+  vendió. El invariante `disponible = Σ ledger` se mantiene.
+- **Rechazo (flujo 4a):** el `Pago` queda `FALLIDO`, el pedido **sigue**
+  `PENDIENTE_PAGO` y la reserva **NO** se libera (el cliente puede reintentar);
+  solo la expiración libera. Tanto captura como rechazo responden **200** (el
+  cliente interpreta el desenlace desde el cuerpo, uniforme para el front).
+- **Expiración (CU-03 4a):** `ExpiracionReservasService.expirarReservasVencidas()`
+  busca pedidos `PENDIENTE_PAGO` con `fechaCreacion < now − ttl`; por cada uno, en
+  **su propia transacción** (`CancelacionPedidoService`, bean aparte para que el
+  proxy aplique), libera Redis (`ArbitroStock.compensar`, +unidades), registra
+  `CANCELACION` (+) por ítem y pasa el pedido a `CANCELADO`. El disponible vuelve
+  al valor previo a la reserva. Ventana configurable
+  `app.pedido.reserva-ttl-seconds` (`${VAR:900}`).
+- **Idempotencia del job:** la guardia es la transición `PENDIENTE_PAGO →
+  CANCELADO`; si ya no está pendiente, se omite. Correr dos veces no doble-libera.
+  *Límite conocido:* en single-instance basta; multi-instancia requeriría un lock
+  distribuido (fuera del MVP).
+- **Scheduler desactivado en test** (`SchedulingConfig` con `@EnableScheduling
+  @Profile("!test")`): el método se invoca a mano con un corte determinista
+  (`expirarAnterioresA(Instant)`) para que las pruebas no dependan del reloj.
+- **Constancia (RF-13):** `GET /pedidos/{id}` incluye `ultimoPago` (estado,
+  referencia, monto). `PedidoService` lee el último intento vía `PagoRepository`
+  (acoplamiento pedido→pago acotado a esta lectura; `Pago` ya referencia `Pedido`).
+- DTOs como `record`; excepciones con `@ResponseStatus` (`EstadoPedidoInvalido`
+  409, reutiliza `PedidoNoEncontrado` 404). Sin Flyway, sin deps nuevas.
+
+### Verificación
+
+- `mvn clean test` (Docker `maven:3.9-eclipse-temurin-17`) →
+  **`BUILD SUCCESS`, `Tests run: 51, Failures: 0, Errors: 0`** (10 nuevos).
+- **TDD máquina de estados** (`PagoControllerTest`): captura → `PAGADO` con
+  `CONFIRMACION` neutral; rechazo → sigue `PENDIENTE_PAGO`, reserva no liberada;
+  reintento tras fallo → `PAGADO`; pagar `PAGADO` → 409; RN-04 (Pago sin tarjeta);
+  constancia con `ultimoPago`; pago ajeno → 404.
+- **Expiración** (`ExpiracionReservasServiceTest`): vencido → `CANCELADO` con
+  Redis y ledger restaurados; idempotencia (segunda corrida no libera); pedido
+  `PAGADO` intacto.
+
+### Deuda conocida al cerrar el MVP
+
+- **Auth local → Cognito** (solo cambia el decoder en `SecurityConfig`).
+- **Redis ↔ ledger sin reconciliación automática** (límite aceptado de 5a).
+- **Back-office `[+]` necesario** para cerrar el ciclo `PAGADO → CONFIRMADO` (y
+  `PAGADO → CANCELADO` con reembolso).
 
 ---
 
@@ -332,12 +425,15 @@ habría que instalar/apuntar a un JDK 17.
 - **Fase 5a — Compra (checkout): hecha** (ver sección arriba): reserva atómica
   (Redis/Lua) **antes** del cobro, creación del pedido con precio/dirección
   congelados y TDD de total + sobreventa.
-- **Fase 5b — Compra (pago y cierre):** `POST /pedidos/{id}/pago` (CU-04, pago
-  simulado) + confirmación del pedido (`PAGADO`/`CONFIRMADO`) + **consolidación de
-  reservas en venta** (movimiento `CONFIRMACION`) + **expiración de reservas**
-  (movimiento `CANCELACION`, que libera el contador en Redis y pasa el pedido a
-  `CANCELADO`). Aquí entra el **TDD de la transición de estados del pedido**.
-- **Inventario:** servicio de cálculo de stock (físico / reservado / disponible)
-  sobre el ledger; eventual reconciliación Redis↔ledger (límite conocido de 5a).
+- **Fase 5b — Compra (pago y cierre): hecha** (ver sección arriba): pago simulado
+  (CU-04), consolidación de reservas (`CONFIRMACION` neutral), expiración
+  (`CANCELACION` + liberación de Redis → `CANCELADO`) y TDD de la transición de
+  estados. **Con esto el backend del MVP queda funcionalmente completo.**
+- **Back-office `[+]` (post-MVP):** cerrar `PAGADO → CONFIRMADO` (despacho) y
+  `PAGADO → CANCELADO` (reembolso); alta/edición de catálogo e importación de
+  inventario (RF-14..18); entidades `STAFF`, `PROMOCION`, `RESENA`, `ENVIO`.
+- **IaC / migración:** auth local → Cognito (cambiar el decoder en
+  `SecurityConfig`); reconciliación Redis↔ledger (límite conocido de 5a);
+  empaquetado Docker y despliegue Terraform/Ansible.
 - **Entidades `[+]` no construidas aún** (fuera del MVP): `PROMOCION`, `STAFF`,
   `RESENA`, `ENVIO`.

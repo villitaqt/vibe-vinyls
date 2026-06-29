@@ -2,9 +2,11 @@ package com.vivevinyls.pedido;
 
 import java.util.List;
 
+import com.vivevinyls.pago.Pago;
 import com.vivevinyls.pedido.web.PedidoResponse;
 import com.vivevinyls.pedido.web.PedidoResponse.DireccionEnvioResponse;
 import com.vivevinyls.pedido.web.PedidoResponse.ItemResponse;
+import com.vivevinyls.pedido.web.PedidoResponse.UltimoPago;
 
 /**
  * Mapea la entidad {@link Pedido} a su DTO de respuesta. Debe invocarse dentro
@@ -17,7 +19,11 @@ final class PedidoResponseMapper {
     private PedidoResponseMapper() {
     }
 
-    static PedidoResponse aResponse(Pedido pedido) {
+    /**
+     * @param ultimoPago último intento de pago del pedido (o {@code null} si no
+     *                   tiene ninguno), para la constancia (RF-13).
+     */
+    static PedidoResponse aResponse(Pedido pedido, Pago ultimoPago) {
         List<ItemResponse> items = pedido.getItems().stream()
                 .map(PedidoResponseMapper::aItem)
                 .toList();
@@ -31,13 +37,19 @@ final class PedidoResponseMapper {
                 pedido.getEnvioCodigoPostal(),
                 pedido.getEnvioTelefono());
 
+        UltimoPago pago = ultimoPago == null ? null : new UltimoPago(
+                ultimoPago.getEstado().name(),
+                ultimoPago.getReferenciaExterna(),
+                ultimoPago.getMonto());
+
         return new PedidoResponse(
                 pedido.getId(),
                 pedido.getEstado().name(),
                 pedido.getTotal(),
                 items,
                 direccion,
-                pedido.getFechaCreacion());
+                pedido.getFechaCreacion(),
+                pago);
     }
 
     private static ItemResponse aItem(ItemPedido item) {

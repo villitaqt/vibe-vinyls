@@ -16,7 +16,8 @@ public record PedidoResponse(
         BigDecimal total,
         List<ItemResponse> items,
         DireccionEnvioResponse direccionEnvio,
-        Instant fechaCreacion) {
+        Instant fechaCreacion,
+        UltimoPago ultimoPago) {
 
     public record ItemResponse(
             UUID viniloId,
@@ -34,5 +35,12 @@ public record PedidoResponse(
             String pais,
             String codigoPostal,
             String telefono) {
+    }
+
+    /**
+     * Estado del último intento de pago, para que el GET sirva de constancia
+     * (RF-13). Es {@code null} mientras el pedido no tenga ningún intento.
+     */
+    public record UltimoPago(String estado, String referenciaExterna, BigDecimal monto) {
     }
 }

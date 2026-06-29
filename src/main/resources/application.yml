@@ -38,6 +38,12 @@ app:
     secret: ${JWT_SECRET:dev-secret-vivevinyls-cambiar-en-produccion-0123456789}
     issuer: ${JWT_ISSUER:vivevinyls}
     expiracion-segundos: ${JWT_EXP_SEGUNDOS:3600}
+  # Compra (Fase 5b): ventana de reserva. Pasada, el job de expiración cancela el
+  # pedido PENDIENTE_PAGO y libera el stock. 'expiracion-check-ms' es el intervalo
+  # del scheduler (no aplica en test: la planificación está desactivada ahí).
+  pedido:
+    reserva-ttl-seconds: ${RESERVA_TTL_SECONDS:900}
+    expiracion-check-ms: ${EXPIRACION_CHECK_MS:60000}
 
 management:
   endpoints:

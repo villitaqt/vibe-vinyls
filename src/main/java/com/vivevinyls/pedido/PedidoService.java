@@ -17,6 +17,8 @@ import com.vivevinyls.cuenta.DireccionRepository;
 import com.vivevinyls.inventario.ArbitroStock;
 import com.vivevinyls.inventario.ItemReserva;
 import com.vivevinyls.inventario.ResultadoReserva;
+import com.vivevinyls.pago.Pago;
+import com.vivevinyls.pago.PagoRepository;
 import com.vivevinyls.pedido.web.CrearPedidoRequest;
 import com.vivevinyls.pedido.web.CrearPedidoRequest.ItemPedidoRequest;
 import com.vivevinyls.pedido.web.PedidoResponse;
@@ -43,14 +45,17 @@ public class PedidoService {
     private final PedidoRepository pedidos;
     private final ViniloRepository vinilos;
     private final DireccionRepository direcciones;
+    private final PagoRepository pagos;
 
     public PedidoService(ArbitroStock arbitro, PedidoCreacionService creacion,
-            PedidoRepository pedidos, ViniloRepository vinilos, DireccionRepository direcciones) {
+            PedidoRepository pedidos, ViniloRepository vinilos, DireccionRepository direcciones,
+            PagoRepository pagos) {
         this.arbitro = arbitro;
         this.creacion = creacion;
         this.pedidos = pedidos;
         this.vinilos = vinilos;
         this.direcciones = direcciones;
+        this.pagos = pagos;
     }
 
     public PedidoResponse checkout(UUID clienteId, CrearPedidoRequest req) {
@@ -78,7 +83,14 @@ public class PedidoService {
         Pedido pedido = pedidos.findById(pedidoId)
                 .filter(p -> p.getCliente().getId().equals(clienteId))
                 .orElseThrow(() -> new PedidoNoEncontradoException(pedidoId));
-        return PedidoResponseMapper.aResponse(pedido);
+        return PedidoResponseMapper.aResponse(pedido, ultimoPago(pedidoId));
+    }
+
+    /** Último intento de pago del pedido (el más reciente), o null si no hay. */
+    private Pago ultimoPago(UUID pedidoId) {
+        return pagos.findByPedidoId(pedidoId).stream()
+                .max(java.util.Comparator.comparing(Pago::getFechaCreacion))
+                .orElse(null);
     }
 
     /** Valida forma del request y fusiona líneas duplicadas (mismo vinilo). */
