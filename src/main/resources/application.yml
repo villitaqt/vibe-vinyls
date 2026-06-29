@@ -31,6 +31,13 @@ server:
 app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  # JWT del auth local (HS256). Temporal hasta Cognito: el mismo secreto firma y
+  # valida. El secreto debe tener >=32 bytes (256 bits) para HS256; en producción
+  # se inyecta por variable de entorno (nunca el default de dev).
+  jwt:
+    secret: ${JWT_SECRET:dev-secret-vivevinyls-cambiar-en-produccion-0123456789}
+    issuer: ${JWT_ISSUER:vivevinyls}
+    expiracion-segundos: ${JWT_EXP_SEGUNDOS:3600}
 
 management:
   endpoints:

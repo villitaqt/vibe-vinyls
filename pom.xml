@@ -34,6 +34,19 @@
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
 
+        <!--
+          Seguridad: el backend actúa como resource server que valida un JWT
+          (HS256, secreto simétrico) en cada request protegida. Esta elección es
+          deliberada: es el rol que describe el acta y deja la migración a Cognito
+          como poco más que cambiar el decoder (SecretKeySpec -> JWK Set URI). El
+          starter arrastra Nimbus JOSE+JWT (emisión/validación) y spring-security-crypto
+          (BCrypt); por eso NO se añade jjwt.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+
         <!-- Redis -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
