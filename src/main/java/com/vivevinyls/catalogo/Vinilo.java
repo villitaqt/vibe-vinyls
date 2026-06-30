@@ -48,6 +48,13 @@ public class Vinilo {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal precio;
 
+    /**
+     * URL de la portada (nullable): sin imágenes reales todavía. El frontend
+     * muestra un placeholder cuando es {@code null}; poblarla no es de esta fase.
+     */
+    @Column(name = "portada_url")
+    private String portadaUrl;
+
     /** Sello editor: uno por vinilo. */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "sello_id", nullable = false)

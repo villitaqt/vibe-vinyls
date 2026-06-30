@@ -13,6 +13,7 @@ public record ViniloResumenDTO(
         String titulo,
         Integer anio,
         BigDecimal precio,
+        String portadaUrl,
         String sello,
         List<String> artistas,
         int stockDisponible) {

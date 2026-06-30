@@ -143,6 +143,24 @@ class CatalogoControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void portadaUrlViajaEnElDtoCuandoEstaSeteadaYEsNullCuandoNo() throws Exception {
+        // Sin portada: el campo viaja como null.
+        mockMvc.perform(get("/vinilos/{id}", idLoveSupreme))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.portadaUrl").isEmpty());
+
+        // Al setear la portada, el DTO la expone.
+        Vinilo loveSupreme = vinilos.findById(idLoveSupreme).orElseThrow();
+        loveSupreme.setPortadaUrl("https://cdn.vivevinyls.test/love-supreme.jpg");
+        vinilos.saveAndFlush(loveSupreme);
+
+        mockMvc.perform(get("/vinilos/{id}", idLoveSupreme))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.portadaUrl")
+                        .value("https://cdn.vivevinyls.test/love-supreme.jpg"));
+    }
+
     private Vinilo guardarVinilo(String titulo, int anio, String precio,
             Sello sello, Artista artista, Genero genero) {
         Vinilo vinilo = new Vinilo();

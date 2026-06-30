@@ -64,7 +64,7 @@ public class CatalogoService {
 
     private ViniloResumenDTO aResumen(Vinilo v, int stockDisponible) {
         return new ViniloResumenDTO(
-                v.getId(), v.getTitulo(), v.getAnio(), v.getPrecio(),
+                v.getId(), v.getTitulo(), v.getAnio(), v.getPrecio(), v.getPortadaUrl(),
                 v.getSello().getNombre(), nombresArtistas(v), stockDisponible);
     }
 
@@ -74,7 +74,7 @@ public class CatalogoService {
                 .sorted()
                 .toList();
         return new ViniloDetalleDTO(
-                v.getId(), v.getTitulo(), v.getAnio(), v.getPrecio(),
+                v.getId(), v.getTitulo(), v.getAnio(), v.getPrecio(), v.getPortadaUrl(),
                 v.getSello().getNombre(), nombresArtistas(v), generos, stockDisponible);
     }
 
