@@ -10,6 +10,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -41,6 +43,14 @@ public class Cliente {
 
     @Column(nullable = false)
     private String nombre;
+
+    /**
+     * Rol del usuario (default {@code CLIENTE}). Se expone en el claim
+     * {@code role} del JWT. Asignar STAFF/ADMIN es tarea de back-office (post-MVP).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private RolCliente rol = RolCliente.CLIENTE;
 
     /** Identificador del sujeto en Cognito (sub del JWT). */
     @Column(name = "cognito_sub", unique = true)

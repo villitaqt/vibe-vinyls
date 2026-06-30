@@ -6,6 +6,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.vivevinyls.cuenta.web.ClienteDTO;
 import com.vivevinyls.cuenta.web.LoginRequest;
 import com.vivevinyls.cuenta.web.LoginResponse;
 import com.vivevinyls.cuenta.web.RegistroRequest;
@@ -105,8 +106,10 @@ public class AuthService {
 
         Cliente cliente = credencial.getCliente();
         String token = tokenService.emitir(cliente);
+        ClienteDTO datos = new ClienteDTO(cliente.getId(), cliente.getEmail(),
+                cliente.getNombre(), cliente.getRol().name());
         return new LoginResponse(token, "Bearer", cliente.getId(),
-                tokenService.getExpiracionSegundos());
+                tokenService.getExpiracionSegundos(), datos);
     }
 
     private String generarCodigo() {

@@ -15,6 +15,50 @@ Bitácora por fases. Retomar siempre desde aquí en un chat nuevo de Claude Code
 - **Fase 5b (compra — pago y cierre):** completada (este documento). Pago
   simulado, consolidación de reservas y expiración. **El backend del MVP queda
   funcionalmente completo** (registro → catálogo → checkout → pago → constancia).
+- **Ajuste (portadaUrl + rol en JWT):** completado (este documento). Previo al
+  frontend.
+
+---
+
+## Ajuste — portadaUrl en Vinilo y rol en el JWT (hecho)
+
+Dos cambios pequeños e independientes, previos al frontend completo. No tocan
+lógica de negocio existente.
+
+### portadaUrl en el catálogo
+
+- `Vinilo.portadaUrl` (`String`, **nullable**): URL de portada. Sin imágenes
+  reales aún; el frontend usa placeholder cuando es `null`. Columna nueva nullable
+  → la añade Hibernate (`ddl-auto: update`/`create-drop`), sin migración manual.
+- Añadido a `ViniloResumenDTO` y `ViniloDetalleDTO` y al mapeo en `CatalogoService`.
+- **Sin** carrusel ni tabla de múltiples imágenes (fuera de alcance): solo el
+  campo singular.
+
+### Rol en el JWT
+
+- **Dónde vive el rol:** campo `Cliente.rol` (enum `RolCliente` STRING: `CLIENTE`,
+  `STAFF`, `ADMIN`; default `CLIENTE`). Se eligió el campo directo en `Cliente`
+  (camino recomendado): es el sujeto que se autentica y evita una tabla nueva. La
+  columna es `nullable = false`; al registrarse, todo cliente nace `CLIENTE`.
+- **JWT:** `TokenService` añade el claim `role` (string) junto a `sub` y `email`.
+- **`ClienteDTO`** (`id`, `email`, `nombre`, `rol`) se incluye en `LoginResponse`
+  (campo `cliente`) para que el frontend tenga el rol sin decodificar el JWT;
+  `clienteId` se mantiene por compatibilidad.
+- **No** hay endpoints de gestión de roles (eso es back-office). `SecurityConfig`
+  sin cambios (ninguna ruta nueva protegida por rol todavía).
+- **Crear un usuario STAFF/ADMIN de prueba manualmente** (no hay endpoint): tras
+  registrar y verificar el cliente, promover su rol por SQL directo, p. ej.
+  ```sql
+  UPDATE cliente SET rol = 'ADMIN' WHERE email = 'admin@vivevinyls.com';
+  ```
+  (o, en un test, setear `cliente.setRol(RolCliente.STAFF)` antes de emitir el token).
+
+### Verificación
+
+- `mvn clean test` (Docker `maven:3.9-eclipse-temurin-17`) →
+  **`BUILD SUCCESS`, `Tests run: 53, Failures: 0, Errors: 0`** (2 nuevos):
+  `portadaUrl` viaja en el DTO (valor cuando se setea, `null` cuando no) y el login
+  expone `cliente.rol` = `CLIENTE` con el claim `role` presente en el JWT emitido.
 
 ---
 

@@ -41,6 +41,7 @@ public class TokenService {
                 .expiresAt(ahora.plusSeconds(expiracionSegundos))
                 .subject(cliente.getId().toString())
                 .claim("email", cliente.getEmail())
+                .claim("role", cliente.getRol().name())
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
         return encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

@@ -1,5 +1,6 @@
 package com.vivevinyls.cuenta.web;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -10,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +35,7 @@ class CuentaControllerTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper json;
+    @Autowired private JwtDecoder jwtDecoder;
 
     @Test
     void registroDevuelveClienteIdYCodigoTemporal() throws Exception {
@@ -94,6 +97,25 @@ class CuentaControllerTest {
                 .andExpect(jsonPath("$.token").isNotEmpty())
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.clienteId").isNotEmpty());
+    }
+
+    @Test
+    void loginIncluyeRolPorDefectoEnLaRespuestaYEnElClaimDelToken() throws Exception {
+        String codigo = registrar("rol@vivevinyls.com", "Cliente", "secreto123");
+        verificarOk("rol@vivevinyls.com", codigo);
+
+        MvcResult login = mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(login("rol@vivevinyls.com", "secreto123")))
+                .andExpect(status().isOk())
+                // ClienteDTO en la respuesta trae el rol (default CLIENTE).
+                .andExpect(jsonPath("$.cliente.rol").value("CLIENTE"))
+                .andExpect(jsonPath("$.cliente.email").value("rol@vivevinyls.com"))
+                .andReturn();
+
+        // El JWT emitido incluye el claim 'role'.
+        String token = json.readTree(login.getResponse().getContentAsString()).get("token").asText();
+        assertThat(jwtDecoder.decode(token).getClaimAsString("role")).isEqualTo("CLIENTE");
     }
 
     @Test
