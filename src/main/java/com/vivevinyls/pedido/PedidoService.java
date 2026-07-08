@@ -1,6 +1,7 @@
 package com.vivevinyls.pedido;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,7 @@ import com.vivevinyls.pago.PagoRepository;
 import com.vivevinyls.pedido.web.CrearPedidoRequest;
 import com.vivevinyls.pedido.web.CrearPedidoRequest.ItemPedidoRequest;
 import com.vivevinyls.pedido.web.PedidoResponse;
+import com.vivevinyls.pedido.web.PedidoResumenDTO;
 
 /**
  * Orquesta el checkout (CU-03) y la consulta del pedido (RF-13).
@@ -86,10 +88,31 @@ public class PedidoService {
         return PedidoResponseMapper.aResponse(pedido, ultimoPago(pedidoId));
     }
 
+    /** Historial de pedidos del cliente (RF-13), más reciente primero. */
+    @Transactional(readOnly = true)
+    public List<PedidoResumenDTO> pedidosDelCliente(UUID clienteId) {
+        return pedidos.findByClienteId(clienteId).stream()
+                .sorted(Comparator.comparing(Pedido::getFechaCreacion).reversed())
+                .map(this::aResumen)
+                .toList();
+    }
+
+    private PedidoResumenDTO aResumen(Pedido pedido) {
+        Pago ultimoPago = ultimoPago(pedido.getId());
+        int cantidadItems = pedido.getItems().stream().mapToInt(ItemPedido::getCantidad).sum();
+        return new PedidoResumenDTO(
+                pedido.getId(),
+                pedido.getFechaCreacion(),
+                pedido.getEstado(),
+                pedido.getTotal(),
+                cantidadItems,
+                ultimoPago == null ? null : ultimoPago.getEstado().name());
+    }
+
     /** Último intento de pago del pedido (el más reciente), o null si no hay. */
     private Pago ultimoPago(UUID pedidoId) {
         return pagos.findByPedidoId(pedidoId).stream()
-                .max(java.util.Comparator.comparing(Pago::getFechaCreacion))
+                .max(Comparator.comparing(Pago::getFechaCreacion))
                 .orElse(null);
     }
 

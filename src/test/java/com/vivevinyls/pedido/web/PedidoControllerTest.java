@@ -223,6 +223,57 @@ class PedidoControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void misPedidosSinTokenDevuelve401() throws Exception {
+        mockMvc.perform(get("/pedidos/me"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void misPedidosSinPedidosDevuelveListaVacia() throws Exception {
+        Sesion sesion = registrar("sinpedidos@vivevinyls.com");
+
+        mockMvc.perform(get("/pedidos/me")
+                        .header("Authorization", "Bearer " + sesion.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
+    void misPedidosDevuelvePedidosDelClienteOrdenadosPorFechaDescendente() throws Exception {
+        Sesion sesion = registrar("conpedidos@vivevinyls.com");
+        Vinilo vinilo = crearVinilo("Disco", "20.00", 5);
+        UUID direccionId = crearDireccion(sesion.clienteId());
+
+        UUID primerPedido = crearPedido(sesion.token(), vinilo.getId(), 1, direccionId);
+        UUID segundoPedido = crearPedido(sesion.token(), vinilo.getId(), 2, direccionId);
+
+        mockMvc.perform(get("/pedidos/me")
+                        .header("Authorization", "Bearer " + sesion.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].pedidoId").value(segundoPedido.toString()))
+                .andExpect(jsonPath("$[0].cantidadItems").value(2))
+                .andExpect(jsonPath("$[1].pedidoId").value(primerPedido.toString()))
+                .andExpect(jsonPath("$[1].cantidadItems").value(1));
+    }
+
+    @Test
+    void misPedidosNoDevuelvePedidosDeOtroCliente() throws Exception {
+        Sesion duenio = registrar("duenioHistorial@vivevinyls.com");
+        Sesion otro = registrar("otroHistorial@vivevinyls.com");
+        Vinilo vinilo = crearVinilo("Disco", "20.00", 5);
+        UUID direccionId = crearDireccion(duenio.clienteId());
+        crearPedido(duenio.token(), vinilo.getId(), 1, direccionId);
+
+        mockMvc.perform(get("/pedidos/me")
+                        .header("Authorization", "Bearer " + otro.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
     // --- helpers ---------------------------------------------------------
 
     private record Sesion(String token, UUID clienteId) {

@@ -1,5 +1,6 @@
 package com.vivevinyls.pedido.web;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -39,6 +40,14 @@ public class PedidoController {
     public PedidoResponse crear(@AuthenticationPrincipal Jwt jwt,
             @RequestBody CrearPedidoRequest req) {
         return pedidos.checkout(clienteId(jwt), req);
+    }
+
+    // IMPORTANTE: este mapping debe estar ANTES de GET /{id} en el controlador
+    // para que Spring no intente parsear "me" como UUID.
+    /** Historial de pedidos del cliente autenticado, más reciente primero. */
+    @GetMapping("/me")
+    public List<PedidoResumenDTO> misPedidos(@AuthenticationPrincipal Jwt jwt) {
+        return pedidos.pedidosDelCliente(clienteId(jwt));
     }
 
     /** Estado y detalle del pedido del cliente; 404 si no existe o es ajeno. */
