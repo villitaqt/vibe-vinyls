@@ -17,6 +17,53 @@ Bitácora por fases. Retomar siempre desde aquí en un chat nuevo de Claude Code
   funcionalmente completo** (registro → catálogo → checkout → pago → constancia).
 - **Ajuste (portadaUrl + rol en JWT):** completado (este documento). Previo al
   frontend.
+- **Fixes post-MVP (`GET /pedidos/me` + rename `RolCliente` → `Rol`):**
+  completados (este documento).
+
+---
+
+## Fixes post-MVP (hecho)
+
+Dos cambios pequeños e independientes tras cerrar el MVP funcional.
+
+### `GET /pedidos/me` — historial de pedidos del cliente
+
+- El frontend necesitaba el historial de compras del cliente autenticado, que
+  no existía como endpoint dedicado.
+- **Mapping `GET /me` declarado ANTES de `GET /{id}`** en `PedidoController`:
+  si no, Spring intenta resolver `/pedidos/me` contra `/pedidos/{id}` e
+  interpreta `"me"` como un `UUID`, lo que revienta con 400 en vez de resolver
+  la ruta correcta.
+- `PedidoResumenDTO` (record) nuevo: `pedidoId`, `fechaCreacion`, `estado`,
+  `total`, `cantidadItems` (suma de cantidades de los ítems) y
+  `estadoPagoUltimo` (nullable — nombre del estado del último `Pago`, o `null`
+  si el pedido no tiene ningún intento).
+- `PedidoService.pedidosDelCliente(clienteId)`: reutiliza
+  `PedidoRepository.findByClienteId` (existente desde Fase 2), ordena en
+  memoria por `fechaCreacion` descendente y resuelve el último pago por pedido
+  con el mismo patrón que ya usaba `obtener(...)` para la constancia (RF-13).
+  `@Transactional(readOnly = true)`.
+- Sin cambios en `SecurityConfig`: `/pedidos/**` ya exige autenticación por el
+  default `authenticated`.
+
+### Refactor `RolCliente` → `Rol`
+
+- Rename puro (sin cambio de comportamiento): el enum vivía como `RolCliente`
+  pero la documentación y el diseño siempre lo llamaron `Rol`. El valor en
+  base de datos no cambia (`@Enumerated(EnumType.STRING)`: `'CLIENTE'`,
+  `'STAFF'`, `'ADMIN'`).
+- Archivos tocados: `Rol.java` (antes `RolCliente.java`), `Cliente.java`
+  (campo `rol`) y `DevDataSeeder.java`. `TokenService` ya leía el rol vía
+  `cliente.getRol().name()`, sin referenciar el tipo por nombre — no
+  requirió cambios.
+
+### Verificación
+
+- `mvn -B clean test` (Maven local, JDK 17 Temurin ya disponible en el
+  entorno — antes solo se corría en Docker) →
+  **`BUILD SUCCESS`, `Tests run: 57, Failures: 0, Errors: 0`** (4 nuevos):
+  `GET /pedidos/me` sin token (401), sin pedidos (`[]`), con pedidos propios
+  ordenados por fecha descendente, y aislamiento (no devuelve pedidos ajenos).
 
 ---
 

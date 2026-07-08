@@ -25,6 +25,15 @@ import com.vivevinyls.inventario.MovimientoStock;
 import com.vivevinyls.inventario.MovimientoStockRepository;
 import com.vivevinyls.inventario.TipoMovimiento;
 
+// Agregar estos imports
+import com.vivevinyls.cuenta.Cliente;
+import com.vivevinyls.cuenta.ClienteRepository;
+import com.vivevinyls.cuenta.CredencialLocal;
+import com.vivevinyls.cuenta.CredencialLocalRepository;
+import com.vivevinyls.cuenta.EstadoCredencial;
+import com.vivevinyls.cuenta.Rol;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
 /**
  * Seed de catálogo SOLO para el entorno de desarrollo, para poder ver el
  * frontend contra datos realistas. Inserta ~8 vinilos con sus dimensiones
@@ -50,15 +59,24 @@ public class DevDataSeeder implements ApplicationRunner {
     private final GeneroRepository generos;
     private final ViniloRepository vinilos;
     private final MovimientoStockRepository movimientos;
+    private final ClienteRepository clientes;
+    private final CredencialLocalRepository credenciales;
+    private final PasswordEncoder passwordEncoder;
 
     public DevDataSeeder(SelloRepository sellos, ArtistaRepository artistas,
-            GeneroRepository generos, ViniloRepository vinilos,
-            MovimientoStockRepository movimientos) {
+                         GeneroRepository generos, ViniloRepository vinilos,
+                         MovimientoStockRepository movimientos,
+                         ClienteRepository clientes,
+                         CredencialLocalRepository credenciales,
+                         PasswordEncoder passwordEncoder) {
         this.sellos = sellos;
         this.artistas = artistas;
         this.generos = generos;
         this.vinilos = vinilos;
         this.movimientos = movimientos;
+        this.clientes = clientes;
+        this.credenciales = credenciales;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -111,6 +129,24 @@ public class DevDataSeeder implements ApplicationRunner {
                 art(ella, louis, evans), gen(jazz), 5);
 
         log.info("Seed dev: insertados {} vinilos con sus movimientos de stock.", vinilos.count());
+
+        // Usuario de prueba dev — solo si no existe ya (idempotente independiente del catálogo)
+        if (credenciales.findByCliente_Email("dev@vivevinyls.com").isEmpty()) {
+            Cliente cliente = new Cliente();
+            cliente.setNombre("Dev ViveVinyls");
+            cliente.setEmail("dev@vivevinyls.com");
+            cliente.setRol(Rol.CLIENTE);
+            clientes.save(cliente);
+
+            CredencialLocal cred = new CredencialLocal();
+            cred.setCliente(cliente);
+            cred.setPasswordHash(passwordEncoder.encode("dev12345"));
+            cred.setEstado(EstadoCredencial.ACTIVA); // ya verificada, sin pasar por el flujo
+            cred.setCodigoVerificacion("000000");
+            credenciales.save(cred);
+
+            log.info("Seed dev: usuario de prueba creado — dev@vivevinyls.com / dev12345");
+        }
     }
 
     private Sello sello(String nombre) {

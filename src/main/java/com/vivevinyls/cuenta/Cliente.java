@@ -50,7 +50,7 @@ public class Cliente {
      */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private RolCliente rol = RolCliente.CLIENTE;
+    private Rol rol = Rol.CLIENTE;
 
     /** Identificador del sujeto en Cognito (sub del JWT). */
     @Column(name = "cognito_sub", unique = true)

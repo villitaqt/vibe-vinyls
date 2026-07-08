@@ -14,7 +14,7 @@ package com.vivevinyls.cuenta;
  * asignar roles (eso es back-office). Para un usuario de prueba con otro rol, ver
  * la nota en {@code PROGRESO.md}.</p>
  */
-public enum RolCliente {
+public enum Rol {
     CLIENTE,
     STAFF,
     ADMIN
