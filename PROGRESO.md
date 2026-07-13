@@ -93,12 +93,10 @@ lógica de negocio existente.
   `clienteId` se mantiene por compatibilidad.
 - **No** hay endpoints de gestión de roles (eso es back-office). `SecurityConfig`
   sin cambios (ninguna ruta nueva protegida por rol todavía).
-- **Crear un usuario STAFF/ADMIN de prueba manualmente** (no hay endpoint): tras
-  registrar y verificar el cliente, promover su rol por SQL directo, p. ej.
-  ```sql
-  UPDATE cliente SET rol = 'ADMIN' WHERE email = 'admin@vivevinyls.com';
-  ```
-  (o, en un test, setear `cliente.setRol(RolCliente.STAFF)` antes de emitir el token).
+- **Usuarios STAFF/ADMIN de prueba:** `DevDataSeeder` (perfil `dev`) los crea
+  automáticamente y de forma idempotente al levantar la app —
+  `staff@vivevinyls.com` / `staff12345` y `admin@vivevinyls.com` / `admin123`—
+  para probar el back-office sin tocar la base a mano.
 
 ### Verificación
 
