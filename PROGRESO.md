@@ -97,6 +97,12 @@ lógica de negocio existente.
   automáticamente y de forma idempotente al levantar la app —
   `staff@vivevinyls.com` / `staff12345` y `admin@vivevinyls.com` / `admin123`—
   para probar el back-office sin tocar la base a mano.
+- **Fix CORS `/admin/**`:** `CorsConfig.java` mapeaba `/vinilos`, `/auth`,
+  `/clientes` y `/pedidos`, pero nunca se actualizó al construir el
+  back-office (Frontend 3) — el dashboard admin fallaba con `Failed to fetch`
+  por falta de `Access-Control-Allow-Origin`. Se agregó el mapping de
+  `/admin/**` (GET/POST/PUT/DELETE, `allowedHeaders("*")` para el JWT en
+  `Authorization`), mismos orígenes parametrizados de siempre.
 
 ### Verificación
 

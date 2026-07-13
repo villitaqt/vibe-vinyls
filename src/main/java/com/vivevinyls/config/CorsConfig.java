@@ -49,5 +49,12 @@ public class CorsConfig implements WebMvcConfigurer {
                 .allowedOrigins(allowedOrigins)
                 .allowedMethods("GET", "POST")
                 .allowedHeaders("*");
+
+        // Back-office (Frontend 3): gestión de pedidos/catálogo/stock, protegido
+        // por rol STAFF/ADMIN con el JWT en la cabecera Authorization.
+        registry.addMapping("/admin/**")
+                .allowedOrigins(allowedOrigins)
+                .allowedMethods("GET", "POST", "PUT", "DELETE")
+                .allowedHeaders("*");
     }
 }
