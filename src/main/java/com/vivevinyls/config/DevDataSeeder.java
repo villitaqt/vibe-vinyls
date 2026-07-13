@@ -82,12 +82,16 @@ public class DevDataSeeder implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        seedCatalogo();
+        seedUsuarios();
+    }
+
+    private void seedCatalogo() {
         if (vinilos.count() > 0) {
             log.info("Seed dev: ya hay {} vinilos, no se inserta nada (idempotente).", vinilos.count());
             return;
         }
         log.info("Seed dev: catálogo vacío, insertando datos de ejemplo...");
-
         // Dimensiones reutilizadas entre vinilos (evita duplicar sellos/artistas/géneros).
         Sello impulse = sello("Impulse!");
         Sello columbia = sello("Columbia");
@@ -129,60 +133,31 @@ public class DevDataSeeder implements ApplicationRunner {
                 art(ella, louis, evans), gen(jazz), 5);
 
         log.info("Seed dev: insertados {} vinilos con sus movimientos de stock.", vinilos.count());
+    }
 
-        // Usuario de prueba dev — solo si no existe ya (idempotente independiente del catálogo)
-        if (credenciales.findByCliente_Email("dev@vivevinyls.com").isEmpty()) {
-            Cliente cliente = new Cliente();
-            cliente.setNombre("Dev ViveVinyls");
-            cliente.setEmail("dev@vivevinyls.com");
-            cliente.setRol(Rol.CLIENTE);
-            clientes.save(cliente);
+    public void seedUsuarios() {
+        crearUsuarioSiNoExiste("dev@vivevinyls.com", "Dev ViveVinyls", "dev12345", Rol.CLIENTE);
+        crearUsuarioSiNoExiste("staff@vivevinyls.com", "Staff ViveVinyls", "staff12345", Rol.STAFF);
+        crearUsuarioSiNoExiste("admin@vivevinyls.com", "Admin ViveVinyls", "admin123", Rol.ADMIN);
+    }
 
-            CredencialLocal cred = new CredencialLocal();
-            cred.setCliente(cliente);
-            cred.setPasswordHash(passwordEncoder.encode("dev12345"));
-            cred.setEstado(EstadoCredencial.ACTIVA); // ya verificada, sin pasar por el flujo
-            cred.setCodigoVerificacion("000000");
-            credenciales.save(cred);
+    private void crearUsuarioSiNoExiste(String email, String nombre, String password, Rol rol) {
+        if (credenciales.findByCliente_Email(email).isPresent()) return;
 
-            log.info("Seed dev: usuario de prueba creado — dev@vivevinyls.com / dev12345");
-        }
+        Cliente cliente = new Cliente();
+        cliente.setNombre(nombre);
+        cliente.setEmail(email);
+        cliente.setRol(rol);
+        clientes.save(cliente);
 
-        // Usuario de staff de prueba para el back-office (Frontend 3) — independiente del catálogo.
-        if (credenciales.findByCliente_Email("staff@vivevinyls.com").isEmpty()) {
-            Cliente staff = new Cliente();
-            staff.setNombre("Staff ViveVinyls");
-            staff.setEmail("staff@vivevinyls.com");
-            staff.setRol(Rol.STAFF);
-            clientes.save(staff);
+        CredencialLocal cred = new CredencialLocal();
+        cred.setCliente(cliente);
+        cred.setPasswordHash(passwordEncoder.encode(password));
+        cred.setEstado(EstadoCredencial.ACTIVA);
+        cred.setCodigoVerificacion("000000");
+        credenciales.save(cred);
 
-            CredencialLocal credStaff = new CredencialLocal();
-            credStaff.setCliente(staff);
-            credStaff.setPasswordHash(passwordEncoder.encode("staff12345"));
-            credStaff.setEstado(EstadoCredencial.ACTIVA);
-            credStaff.setCodigoVerificacion("000000");
-            credenciales.save(credStaff);
-
-            log.info("Seed dev: usuario staff creado — staff@vivevinyls.com / staff12345");
-        }
-
-        // Usuario admin de prueba para el back-office (Frontend 3) — independiente del catálogo.
-        if (credenciales.findByCliente_Email("admin@vivevinyls.com").isEmpty()) {
-            Cliente admin = new Cliente();
-            admin.setNombre("Admin ViveVinyls");
-            admin.setEmail("admin@vivevinyls.com");
-            admin.setRol(Rol.ADMIN);
-            clientes.save(admin);
-
-            CredencialLocal credAdmin = new CredencialLocal();
-            credAdmin.setCliente(admin);
-            credAdmin.setPasswordHash(passwordEncoder.encode("admin123"));
-            credAdmin.setEstado(EstadoCredencial.ACTIVA);
-            credAdmin.setCodigoVerificacion("000000");
-            credenciales.save(credAdmin);
-
-            log.info("Seed dev: usuario admin creado — admin@vivevinyls.com / admin123");
-        }
+        log.info("Seed dev: usuario {} creado — {} / {}", rol, email, password);
     }
 
     private Sello sello(String nombre) {
