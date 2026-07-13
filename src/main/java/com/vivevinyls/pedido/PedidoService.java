@@ -22,7 +22,11 @@ import com.vivevinyls.pago.Pago;
 import com.vivevinyls.pago.PagoRepository;
 import com.vivevinyls.pedido.web.CrearPedidoRequest;
 import com.vivevinyls.pedido.web.CrearPedidoRequest.ItemPedidoRequest;
+import com.vivevinyls.pedido.web.PedidoAdminDTO;
+import com.vivevinyls.pedido.web.PedidoAdminDTO.ClienteResumen;
+import com.vivevinyls.pedido.web.PedidoAdminDTO.ItemResumen;
 import com.vivevinyls.pedido.web.PedidoResponse;
+import com.vivevinyls.pedido.web.PedidoResponse.DireccionEnvioResponse;
 import com.vivevinyls.pedido.web.PedidoResumenDTO;
 
 /**
@@ -95,6 +99,54 @@ public class PedidoService {
                 .sorted(Comparator.comparing(Pedido::getFechaCreacion).reversed())
                 .map(this::aResumen)
                 .toList();
+    }
+
+    /** Pedidos para el back-office (RF admin), más reciente primero, filtrables por estado. */
+    @Transactional(readOnly = true)
+    public List<PedidoAdminDTO> listarParaAdmin(EstadoPedido filtro) {
+        List<Pedido> lista = filtro == null ? pedidos.findAll() : pedidos.findByEstado(filtro);
+        return lista.stream()
+                .sorted(Comparator.comparing(Pedido::getFechaCreacion).reversed())
+                .map(this::aAdminDTO)
+                .toList();
+    }
+
+    /** Transición PAGADO → CONFIRMADO (staff confirma el despacho). */
+    @Transactional
+    public PedidoResponse confirmarDespacho(UUID pedidoId) {
+        Pedido pedido = pedidos.findById(pedidoId)
+                .orElseThrow(() -> new PedidoNoEncontradoException(pedidoId));
+        if (pedido.getEstado() != EstadoPedido.PAGADO) {
+            throw new EstadoPedidoInvalidoException(
+                    "El pedido debe estar PAGADO para confirmar el despacho (actual: " + pedido.getEstado() + ")");
+        }
+        pedido.setEstado(EstadoPedido.CONFIRMADO);
+        pedidos.save(pedido);
+        return PedidoResponseMapper.aResponse(pedido, ultimoPago(pedidoId));
+    }
+
+    private PedidoAdminDTO aAdminDTO(Pedido pedido) {
+        List<ItemResumen> items = pedido.getItems().stream()
+                .map(item -> new ItemResumen(item.getVinilo().getTitulo(), item.getCantidad()))
+                .toList();
+        int cantidadItems = pedido.getItems().stream().mapToInt(ItemPedido::getCantidad).sum();
+        DireccionEnvioResponse direccion = new DireccionEnvioResponse(
+                pedido.getEnvioDestinatario(),
+                pedido.getEnvioCalle(),
+                pedido.getEnvioCiudad(),
+                pedido.getEnvioRegion(),
+                pedido.getEnvioPais(),
+                pedido.getEnvioCodigoPostal(),
+                pedido.getEnvioTelefono());
+        return new PedidoAdminDTO(
+                pedido.getId(),
+                pedido.getFechaCreacion(),
+                pedido.getEstado(),
+                pedido.getTotal(),
+                new ClienteResumen(pedido.getCliente().getNombre(), pedido.getCliente().getEmail()),
+                cantidadItems,
+                items,
+                direccion);
     }
 
     private PedidoResumenDTO aResumen(Pedido pedido) {

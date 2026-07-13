@@ -1,6 +1,7 @@
 package com.vivevinyls.inventario;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Árbitro de la disputa de stock "en caliente" (RN-02, RN-05, RNF-05): serializa
@@ -28,4 +29,11 @@ public interface ArbitroStock {
      * dejar el contador descuadrado.
      */
     void compensar(List<ItemReserva> items);
+
+    /**
+     * Suma unidades al disponible en caliente tras una importación de stock
+     * (back-office). Si la clave del vinilo aún no está sembrada, se siembra
+     * desde el ledger (que ya incluye la importación) en vez de sumar dos veces.
+     */
+    void incrementarDisponible(UUID viniloId, int cantidad);
 }

@@ -72,6 +72,18 @@ public class ArbitroStockRedis implements ArbitroStock {
         }
     }
 
+    @Override
+    public void incrementarDisponible(UUID viniloId, int cantidad) {
+        String clave = clave(viniloId);
+        // Si la clave no existía, el ledger (leído aquí) ya incluye la importación
+        // recién persistida: sembrar con ese valor equivale a sumarlo una vez.
+        boolean sembrada = Boolean.TRUE.equals(
+                redis.opsForValue().setIfAbsent(clave, Integer.toString(stock.disponible(viniloId))));
+        if (!sembrada) {
+            redis.opsForValue().increment(clave, cantidad);
+        }
+    }
+
     private String clave(UUID viniloId) {
         return PREFIJO + viniloId;
     }

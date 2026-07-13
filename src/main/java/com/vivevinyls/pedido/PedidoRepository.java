@@ -12,4 +12,7 @@ public interface PedidoRepository extends JpaRepository<Pedido, UUID> {
 
     /** Pedidos en un estado dado creados antes de un instante (reservas vencidas). */
     List<Pedido> findByEstadoAndFechaCreacionBefore(EstadoPedido estado, Instant corte);
+
+    /** Pedidos en un estado dado (back-office: filtro de {@code GET /admin/pedidos}). */
+    List<Pedido> findByEstado(EstadoPedido estado);
 }

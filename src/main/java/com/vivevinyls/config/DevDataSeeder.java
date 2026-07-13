@@ -147,6 +147,24 @@ public class DevDataSeeder implements ApplicationRunner {
 
             log.info("Seed dev: usuario de prueba creado — dev@vivevinyls.com / dev12345");
         }
+
+        // Usuario de staff de prueba para el back-office (Frontend 3) — independiente del catálogo.
+        if (credenciales.findByCliente_Email("staff@vivevinyls.com").isEmpty()) {
+            Cliente staff = new Cliente();
+            staff.setNombre("Staff ViveVinyls");
+            staff.setEmail("staff@vivevinyls.com");
+            staff.setRol(Rol.STAFF);
+            clientes.save(staff);
+
+            CredencialLocal credStaff = new CredencialLocal();
+            credStaff.setCliente(staff);
+            credStaff.setPasswordHash(passwordEncoder.encode("staff12345"));
+            credStaff.setEstado(EstadoCredencial.ACTIVA);
+            credStaff.setCodigoVerificacion("000000");
+            credenciales.save(credStaff);
+
+            log.info("Seed dev: usuario staff creado — staff@vivevinyls.com / staff12345");
+        }
     }
 
     private Sello sello(String nombre) {

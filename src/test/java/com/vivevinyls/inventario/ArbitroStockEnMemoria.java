@@ -58,6 +58,16 @@ public class ArbitroStockEnMemoria implements ArbitroStock {
         }
     }
 
+    @Override
+    public synchronized void incrementarDisponible(UUID viniloId, int cantidad) {
+        if (!disponibles.containsKey(viniloId)) {
+            // El ledger (leído aquí) ya incluye la importación recién persistida.
+            disponibles.put(viniloId, stock.disponible(viniloId));
+        } else {
+            disponibles.merge(viniloId, cantidad, Integer::sum);
+        }
+    }
+
     /** Limpia el estado en caliente entre tests (la BD se revierte por @Transactional). */
     public synchronized void vaciar() {
         disponibles.clear();
