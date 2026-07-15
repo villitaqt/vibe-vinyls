@@ -12,6 +12,7 @@ target/
 .settings/
 .project
 .classpath
+.claude/
 
 ### OS ###
 .DS_Store

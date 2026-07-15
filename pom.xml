@@ -19,6 +19,17 @@
 
     <properties>
         <java.version>17</java.version>
+
+        <!--
+          SonarCloud: estos valores corresponden al proyecto creado en sonarcloud.io
+          importando este repo con la cuenta de GitHub villitaqt (organization y
+          project key por defecto que asigna SonarCloud al importar). Si al crear
+          el proyecto la key asignada es distinta, ajustar aquí.
+        -->
+        <sonar.organization>villitaqt</sonar.organization>
+        <sonar.projectKey>villitaqt_vibe-vinyls</sonar.projectKey>
+        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+        <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
     </properties>
 
     <dependencies>
