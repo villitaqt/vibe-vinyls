@@ -1,0 +1,151 @@
+name: Aplicación (build, test, análisis y despliegue)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "pom.xml"
+      - "Dockerfile"
+      - ".github/workflows/app.yml"
+  workflow_dispatch: {}
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: vivevinyls-backend
+  ECS_CLUSTER: vivevinyls-prod
+  ECS_SERVICE: backend
+
+permissions:
+  contents: read
+
+jobs:
+  # Corre los tests unitarios/integración con el perfil 'test' (H2 en memoria vía
+  # src/test/resources/application.yml), sin depender de Postgres/Redis reales.
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Ejecutar tests
+        run: mvn -B test
+
+      # Publica el reporte aunque los tests fallen, para poder inspeccionar qué rompió.
+      - name: Subir reporte de tests como artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: target/surefire-reports
+          if-no-files-found: ignore
+
+  # Análisis estático + cobertura en SonarCloud. No bloquea el pipeline si el
+  # quality gate falla (soft, por tiempo): el resultado se ve en el log y en el
+  # dashboard de Sonar, pero no impide llegar a build/deploy.
+  sonar:
+    name: Análisis estático (SonarCloud)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # SonarCloud necesita el historial completo para el análisis
+
+      - name: Configurar JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Cache de paquetes de SonarCloud
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Ejecutar análisis (verify + sonar:sonar)
+        continue-on-error: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: mvn -B verify sonar:sonar
+
+  # Construye la imagen Docker y la sube a ECR. Solo corre en push directo a
+  # main (nunca en pull requests), ya que publica una imagen que luego se
+  # despliega.
+  build-and-push:
+    name: Build & push a ECR
+    needs: sonar
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      # Credenciales del usuario de CI/CD (vivevinyls-cicd), guardadas como secrets del repo.
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login a ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Construye y publica la imagen como :latest. La URL del repositorio se
+      # obtiene del login a ECR, así no hace falta hardcodear el account ID.
+      - name: Build y push de la imagen
+        id: build
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+  # Fuerza un nuevo despliegue en ECS y espera a que el servicio quede estable.
+  # Si el rolling deployment no llega a estado saludable, el circuit breaker de
+  # ECS (configurado en Terraform) hace rollback y este job falla visiblemente.
+  deploy:
+    name: Deploy a ECS
+    needs: build-and-push
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Forzar nuevo despliegue
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --force-new-deployment \
+            --region "$AWS_REGION"
+
+      - name: Esperar a que el servicio quede estable
+        run: |
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --region "$AWS_REGION"

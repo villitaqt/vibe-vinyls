@@ -25,6 +25,15 @@ import com.vivevinyls.inventario.MovimientoStock;
 import com.vivevinyls.inventario.MovimientoStockRepository;
 import com.vivevinyls.inventario.TipoMovimiento;
 
+// Agregar estos imports
+import com.vivevinyls.cuenta.Cliente;
+import com.vivevinyls.cuenta.ClienteRepository;
+import com.vivevinyls.cuenta.CredencialLocal;
+import com.vivevinyls.cuenta.CredencialLocalRepository;
+import com.vivevinyls.cuenta.EstadoCredencial;
+import com.vivevinyls.cuenta.Rol;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
 /**
  * Seed de catálogo SOLO para el entorno de desarrollo, para poder ver el
  * frontend contra datos realistas. Inserta ~8 vinilos con sus dimensiones
@@ -50,26 +59,39 @@ public class DevDataSeeder implements ApplicationRunner {
     private final GeneroRepository generos;
     private final ViniloRepository vinilos;
     private final MovimientoStockRepository movimientos;
+    private final ClienteRepository clientes;
+    private final CredencialLocalRepository credenciales;
+    private final PasswordEncoder passwordEncoder;
 
     public DevDataSeeder(SelloRepository sellos, ArtistaRepository artistas,
-            GeneroRepository generos, ViniloRepository vinilos,
-            MovimientoStockRepository movimientos) {
+                         GeneroRepository generos, ViniloRepository vinilos,
+                         MovimientoStockRepository movimientos,
+                         ClienteRepository clientes,
+                         CredencialLocalRepository credenciales,
+                         PasswordEncoder passwordEncoder) {
         this.sellos = sellos;
         this.artistas = artistas;
         this.generos = generos;
         this.vinilos = vinilos;
         this.movimientos = movimientos;
+        this.clientes = clientes;
+        this.credenciales = credenciales;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        seedCatalogo();
+        seedUsuarios();
+    }
+
+    private void seedCatalogo() {
         if (vinilos.count() > 0) {
             log.info("Seed dev: ya hay {} vinilos, no se inserta nada (idempotente).", vinilos.count());
             return;
         }
         log.info("Seed dev: catálogo vacío, insertando datos de ejemplo...");
-
         // Dimensiones reutilizadas entre vinilos (evita duplicar sellos/artistas/géneros).
         Sello impulse = sello("Impulse!");
         Sello columbia = sello("Columbia");
@@ -111,6 +133,31 @@ public class DevDataSeeder implements ApplicationRunner {
                 art(ella, louis, evans), gen(jazz), 5);
 
         log.info("Seed dev: insertados {} vinilos con sus movimientos de stock.", vinilos.count());
+    }
+
+    public void seedUsuarios() {
+        crearUsuarioSiNoExiste("dev@vivevinyls.com", "Dev ViveVinyls", "dev12345", Rol.CLIENTE);
+        crearUsuarioSiNoExiste("staff@vivevinyls.com", "Staff ViveVinyls", "staff12345", Rol.STAFF);
+        crearUsuarioSiNoExiste("admin@vivevinyls.com", "Admin ViveVinyls", "admin123", Rol.ADMIN);
+    }
+
+    private void crearUsuarioSiNoExiste(String email, String nombre, String password, Rol rol) {
+        if (credenciales.findByCliente_Email(email).isPresent()) return;
+
+        Cliente cliente = new Cliente();
+        cliente.setNombre(nombre);
+        cliente.setEmail(email);
+        cliente.setRol(rol);
+        clientes.save(cliente);
+
+        CredencialLocal cred = new CredencialLocal();
+        cred.setCliente(cliente);
+        cred.setPasswordHash(passwordEncoder.encode(password));
+        cred.setEstado(EstadoCredencial.ACTIVA);
+        cred.setCodigoVerificacion("000000");
+        credenciales.save(cred);
+
+        log.info("Seed dev: usuario {} creado — {} / {}", rol, email, password);
     }
 
     private Sello sello(String nombre) {
