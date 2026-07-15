@@ -62,6 +62,11 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/vinilos", "/vinilos/**").permitAll()
                         .requestMatchers("/health", "/actuator/**").permitAll()
+                        // El forward interno de Tomcat a /error (tras cualquier sendError, p. ej. un
+                        // 404 de @ResponseStatus en una ruta pública) vuelve a pasar por esta cadena.
+                        // Sin esto, anyRequest().authenticated() lo intercepta y el código real del
+                        // error (404, 500...) queda enmascarado como 401 para requests sin token.
+                        .requestMatchers("/error").permitAll()
                         // Back-office (Frontend 3): solo STAFF/ADMIN, nunca CLIENTE.
                         .requestMatchers("/admin/**").hasAnyRole("STAFF", "ADMIN")
                         // Todo lo demás (p. ej. /clientes/**) exige un JWT válido.
